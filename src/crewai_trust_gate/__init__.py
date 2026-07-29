@@ -1,17 +1,37 @@
 """crewai-trust-gate -- CrewAI tools for Trust Gate post-quantum receipts.
 
-Two tools that any CrewAI agent can register:
+Five tools that any CrewAI agent can register:
 
   MintActionReceiptTool    -- mints a tamper-evident receipt for a consequential action.
   VerifyReceiptTool        -- verifies a Trust Gate receipt from its certificate alone.
+  GateDecisionTool         -- two-phase PREVIEW -> COMMIT gate; PREVIEW assesses risk
+                               without acting, COMMIT verifies the inputs still match
+                               and mints a receipt carrying an execution permit.
+  CheckEgressTool          -- classifies data PUBLIC/INTERNAL/CONFIDENTIAL/RESTRICTED
+                               before it leaves; blocks RESTRICTED.
+  RunExitDrillTool         -- vendor exit-readiness drill. Informational, no side effects.
 
-Receipts signed Ed25519 + ML-DSA-65; PQ-required verify defaults on.
+Receipts signed Ed25519 + ML-DSA-65 (FIPS 204); PQ-required verify defaults on, which
+demands at least one verified post-quantum leg and so defeats downgrade attacks.
 
 Usage:
     from crewai_trust_gate import MintActionReceiptTool, VerifyReceiptTool
     agent = Agent(role="auditor", tools=[VerifyReceiptTool()])
 """
-from crewai_trust_gate.tool import MintActionReceiptTool, VerifyReceiptTool
+from crewai_trust_gate.tool import (
+    CheckEgressTool,
+    GateDecisionTool,
+    MintActionReceiptTool,
+    RunExitDrillTool,
+    VerifyReceiptTool,
+)
 
-__version__ = "0.1.0"
-__all__ = ["MintActionReceiptTool", "VerifyReceiptTool", "__version__"]
+__version__ = "0.2.0"
+__all__ = [
+    "MintActionReceiptTool",
+    "VerifyReceiptTool",
+    "GateDecisionTool",
+    "CheckEgressTool",
+    "RunExitDrillTool",
+    "__version__",
+]
