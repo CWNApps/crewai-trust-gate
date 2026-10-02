@@ -81,10 +81,10 @@ class MintActionReceiptInput(BaseModel):
 class MintActionReceiptTool(BaseTool):
     name: str = "trust_gate_mint_action_receipt"
     description: str = (
-        "Mint a post-quantum, tamper-evident receipt for a consequential agent action. "
-        "Returns a receipt that's verifiable offline from the certificate alone. "
-        "Receipt is signed Ed25519 + ML-DSA-65; carries a 128-bit kid for offline "
-        "same-notary check."
+        "Mint a signed receipt (Ed25519 + ML-DSA-65) for a consequential agent action. Its "
+        "integrity can be checked offline; to know who signed it, verify it with "
+        "expected_kid. A receipt is evidence of what was signed, not proof that the action "
+        "was safe or met any requirement."
     )
     args_schema: Type[BaseModel] = MintActionReceiptInput
 
@@ -110,25 +110,31 @@ class VerifyReceiptInput(BaseModel):
     receipt: Dict[str, Any] = Field(description="The Trust Gate receipt to verify.")
     require_pq: Optional[bool] = Field(
         default=None,
-        description="None=obey TRUST_GATE_REQUIRE_PQ (default true). False=Ed25519-only OK.")
+        description="None=obey the server's TRUST_GATE_REQUIRE_PQ (default true). True=fail unless a post-quantum signature verifies. False=Ed25519-only is accepted.")
+    expected_kid: Optional[str] = Field(
+        default=None,
+        description="kid of the signer you trust (32 hex characters). When set, verification also requires that the receipt was signed by that key; the result reports signer_pinned.")
 
 
 class VerifyReceiptTool(BaseTool):
     name: str = "trust_gate_verify_receipt"
     description: str = (
-        "Verify a Trust Gate receipt from the certificate alone (offline). "
-        "Returns {ok, hash_ok, sig_ok, signed, legs, signature_alg, reason}. "
-        "Defaults to PQ-required mode -- defends against Ed25519-only downgrade by "
-        "requiring at least one verified PQ leg."
+        "Verify a Trust Gate receipt from the receipt itself (offline). Returns ok plus the "
+        "values it checked and signer_pinned. Pass expected_kid, the kid of the server you "
+        "trust, to pin the signer: without it anyone's receipt can verify. With require_pq on "
+        "(the server default) it fails unless a post-quantum signature verifies."
     )
     args_schema: Type[BaseModel] = VerifyReceiptInput
 
     def _run(self, receipt: Dict[str, Any],
-             require_pq: Optional[bool] = None, **kwargs) -> Dict[str, Any]:
+             require_pq: Optional[bool] = None,
+             expected_kid: Optional[str] = None, **kwargs) -> Dict[str, Any]:
         _ping_telemetry()
         args: Dict[str, Any] = {"receipt": receipt}
         if require_pq is not None:
             args["require_pq"] = require_pq
+        if expected_kid is not None:
+            args["expected_kid"] = expected_kid
         return _mcp_call("verify_receipt", args)
 
 
@@ -146,9 +152,12 @@ class GateDecisionInput(BaseModel):
 class GateDecisionTool(BaseTool):
     name: str = "trust_gate_gate_decision"
     description: str = (
-        "Two-phase decision gate. PREVIEW returns a risk assessment and preview_id "
-        "without acting. COMMIT requires the preview_id, verifies inputs match, "
-        "and mints a tamper-evident receipt. Stateless."
+        "Two-phase decision gate (needs Trust Gate MCP server 0.3.0 or later). PREVIEW "
+        "returns a verdict (ALLOW, DENY or ESCALATE) and a preview_id without acting. COMMIT "
+        "evaluates the same inputs again, signs a receipt and returns a permit: GRANTED only "
+        "for ALLOW, DENIED for DENY, WITHHELD_PENDING_HUMAN for ESCALATE. It judges the "
+        "action name and resource against a read-only allowlist and does not observe or block "
+        "anything. Treat a GRANTED permit from a server older than 0.3.0 as not evidence."
     )
     args_schema: Type[BaseModel] = GateDecisionInput
 
@@ -175,9 +184,9 @@ class CheckEgressInput(BaseModel):
 class CheckEgressTool(BaseTool):
     name: str = "trust_gate_check_egress"
     description: str = (
-        "Egress classification check. Scans data for sensitivity markers and "
-        "classifies as PUBLIC / INTERNAL / CONFIDENTIAL / RESTRICTED. Blocks "
-        "RESTRICTED-class egress. Returns classification + tamper-evident receipt."
+        "Egress marker check. Scans data for sensitivity markers and classifies it "
+        "NO_MARKERS_FOUND, INTERNAL, CONFIDENTIAL or RESTRICTED. It flags and cannot block: "
+        "act on a RESTRICTED result yourself. NO_MARKERS_FOUND is not clearance to send."
     )
     args_schema: Type[BaseModel] = CheckEgressInput
 
@@ -193,8 +202,8 @@ class CheckEgressTool(BaseTool):
 class RunExitDrillTool(BaseTool):
     name: str = "trust_gate_run_exit_drill"
     description: str = (
-        "Vendor exit readiness drill. Checks local signing key, local model "
-        "access, and local data export. Returns results + tamper-evident receipt."
+        "Vendor exit readiness drill. Checks the local signing key, local model access and "
+        "local data export, and signs a receipt (which creates the signing key on first use)."
     )
 
     def _run(self, **kwargs) -> Dict[str, Any]:
