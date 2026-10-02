@@ -49,6 +49,8 @@ export TRUST_GATE_URL="https://trust-gate-mcp.onrender.com"  # default; override
 
 This release is written for Trust Gate MCP server 0.3.0 or later. Versions before 0.3.0 of the server's `gate_decision` returned GRANTED for every input: treat any GRANTED permit from a server older than 0.3.0 as not evidence. See the [security advisory](https://github.com/CWNApps/trust-gate-mcp/security/advisories/GHSA-gxfp-4vvx-wjc8).
 
+Passing `expected_kid` to a server older than 0.3.0 raises an error: those servers ignore the argument and would otherwise return `ok` without checking the signer.
+
 ## Telemetry
 
 One fire-and-forget `GET /x?via=crewai&kind=api` per tool call. No PII, no cookies, never blocks the tool.

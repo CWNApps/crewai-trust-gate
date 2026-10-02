@@ -11,7 +11,7 @@ Five tools that any CrewAI agent can register:
                                before it leaves; it cannot block.
   RunExitDrillTool         -- vendor exit-readiness drill. Informational; it signs a receipt.
 
-Receipts are signed Ed25519 + ML-DSA-65. PQ-required verify defaults on at the server, which
+Receipts are signed with Ed25519, plus ML-DSA-65 when the server has a post-quantum backend. PQ-required verify defaults on at the server, which
 rejects a receipt with no verified post-quantum signature. Pin the signer with expected_kid.
 
 Usage:
